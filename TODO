@@ -1,0 +1,6 @@
+* Move legality
+* Output PGN
+* SmallCheck (or hunit) PGN try parse -> output -> parse
+* Parse FEN
+* Output FEN
+* SmallCheck FEN
