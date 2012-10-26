@@ -2,22 +2,18 @@
 {-# LANGUAGE ScopedTypeVariables, NoMonomorphismRestriction,
     FlexibleInstances, FlexibleContexts, RankNTypes #-}
 
-module PGN where
+module PGN (pGame, pGames, pTags, pMoves) where
 
-import Data.Time
 import Data.Char
 import qualified Data.Map as Map
+
 import Text.ParserCombinators.UU
 import Text.ParserCombinators.UU.Utils
 import Text.ParserCombinators.UU.BasicInstances
-import Text.ParserCombinators.UU.Derived
-import Text.ParserCombinators.UU.Core
-import Control.Monad
+
+import GameData
 
 --Todo
--- move data types to separate file
--- check in
--- clean up. Add signatures and module exports. Remove superfluous imports and pragmas
 
 -- Hunit against real data
 -- QuickCheck?
@@ -30,79 +26,33 @@ import Control.Monad
 -- Hackage
 
 
-data Piece = Pawn | Knight | Bishop | Rook | Queen | King
-instance Show Piece where
-    show Pawn = ""
-    show Knight = "N"
-    show Bishop = "B"
-    show Rook = "R"
-    show Queen = "Q"
-    show King = "K"
-
-pieceList = [('N', Knight), ('B', Bishop), ('R', Rook), ('Q', Queen), ('K', King)]
-pieceMap = Map.fromList pieceList
-
-
-data File = File Int
-instance Show File where
-    show (File x) = [chr $ fromEnum 'a' + x]
-
-data Rank = Rank Int
-instance Show Rank where
-    show (Rank i) = show (i + 1)
-
-data Square = Square File Rank
-instance Show Square where
-    show (Square f r) = show f ++ show r
-
-data HelpSquare = HelpSquare (Maybe File) (Maybe Rank)
-instance Show HelpSquare where
-    show (HelpSquare Nothing Nothing) = ""
-    show (HelpSquare (Just f) Nothing) = show f
-    show (HelpSquare Nothing (Just r)) = show r
-    show (HelpSquare (Just f) (Just r)) = show f ++ show r
-
-data Move = Move Piece HelpSquare Square |
-            PawnMove (Maybe File) Square (Maybe Piece) |
-            CastleKS |
-            CastleQS
-
-showNormalPawn s Nothing = show s
-showNormalPawn s (Just p) = show s ++ ('=' : show p)
-
-instance Show Move where
-    show CastleKS = "O-O"
-    show CastleQS = "O-O-O"
-    show (PawnMove Nothing s mp) = showNormalPawn s mp
-    show (PawnMove (Just f) s mp) = show f ++ showNormalPawn s mp
-    show (Move p hs s) = show p ++ show hs ++ show s
-
-data Tag = Tag String String deriving Show
-data Result = WhiteWin | BlackWin | Draw deriving Show
-
-data Game = Game [Tag] [Move] deriving Show
-
+pInverse :: (Char -> Bool) -> Parser Char
 pInverse f = pSatisfy (not . f) (Insertion "inverse error" 'y' 5)
 
 pIdent :: Parser String
 pIdent = lexeme $ pList $ pInverse isSpace
 
+pEscQuoted :: Parser String
 pEscQuoted = lexeme $ pSym '"' *> pList pOKChar <* pSym '"'
     where
         pEscape = pSym '\\' *> (pSym '"' <|> pSym '\\')
         pNonQuote = pInverse ('"' ==)
         pOKChar = pEscape <<|> pNonQuote
 
-
+pTagKeyVal :: Parser Tag
 pTagKeyVal = Tag <$> pIdent <*> pEscQuoted
+
+pTag :: Parser Tag
 pTag = pLBracket *> pTagKeyVal <* pRBracket
+
+pTags :: Parser [Tag]
 pTags = lexeme $ pList1 pTag
 
 charToPiece :: Char -> Piece
 charToPiece = (Map.!) pieceMap
 
 pPiece :: Parser Piece
-pPiece = charToPiece <$> pAnySym $ Map.keys pieceMap
+pPiece = charToPiece <$> pAnySym (Map.keys pieceMap)
 
 pFile :: Parser File
 pFile = (\x -> File (fromEnum x - fromEnum 'a')) <$> pRange ('a', 'h')
@@ -138,10 +88,12 @@ pAnnotation = pSym '$' *> pInteger
 pComment :: Parser String
 pComment = lexeme $ pSym '{' *> pList (pInverse ('}' ==)) <* pSym '}'
 
+isParen :: Char -> Bool
 isParen '(' = True
 isParen ')' = True
 isParen _ = False
 
+pVMoves :: Parser [Char]
 pVMoves = pList (pInverse isParen)
 
 pVariation :: Parser Int
@@ -155,19 +107,26 @@ pMovePair :: Parser (Move, Maybe Move)
 pMovePair = (,) <$> pMove <*> pMaybe pMove
 
 pNumberedMove :: Parser (Move, Maybe Move)
-pNumberedMove = pInteger *> pDot *> pMovePair <* pMaybe pResult
+pNumberedMove = (pInteger::Parser Integer) *> pDot *> pMovePair <* pMaybe pResult
 
---pMoves :: Parser [Move]
+pMoves :: Parser [(Move, Maybe Move)]
 pMoves = lexeme $ pList1 pNumberedMove
 
 pResult :: Parser String
 pResult = lexeme $ pEnumStrs ["1/2-1/2", "1-0", "0-1", "*"]
 
+flattenMove :: (Move, Maybe Move) -> [Move] -> [Move]
 flattenMove (g1, Nothing) gs = g1 : gs
 flattenMove (g1, Just g2) gs = g1 : g2 : gs
+
+flattenMoves :: [(Move, Maybe Move)] -> [Move]
 flattenMoves = foldr flattenMove []
 
+makeGame :: [Tag] -> [(Move, Maybe Move)] -> Game
 makeGame tags moves = Game tags $ flattenMoves moves
 
+pGame :: Parser Game
 pGame = makeGame <$> pTags <*> pMoves
+
+pGames :: Parser [Game]
 pGames = pList pGame

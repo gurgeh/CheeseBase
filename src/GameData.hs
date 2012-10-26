@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module GameData 
        where
 
@@ -60,3 +61,15 @@ data Tag = Tag String String deriving Show
 data Result = WhiteWin | BlackWin | Draw deriving Show
 
 data Game = Game [Tag] [Move] deriving Show
+
+-- Maybe this should be in a separate module?
+
+data Color = White | Black
+data ColoredPiece = ColoredPiece Color Piece
+
+
+data CastleRights = CastleRights [((Move, Color), Bool)]
+type EPFile = Maybe Int
+data Board = Board [[Maybe ColoredPiece]] Color CastleRights EPFile
+
+data ChessSpace = ChessSpace Board [(Move, ChessSpace)]
