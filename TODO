@@ -1,6 +1,27 @@
 * Move legality
+
 * Output PGN
 * SmallCheck (or hunit) PGN try parse -> output -> parse
+
 * Parse FEN
 * Output FEN
 * SmallCheck FEN
+
+* UCI protocol
+* unittest
+
+* Release as standalone chessutil-lib
+
+* Serialize database
+* Import large database
+
+* Calculate simple stats (Bayesian probabilities?)
+
+* Make basic UI
+
+* Calculate tree percentages
+* Calculate tree engine evals
+* Maybe engine monte carlo
+* Maybe calc engine / percent / MC correlation
+
+* Algorithm for searching for novelties and traps from a position
